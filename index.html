@@ -1,71 +1,71 @@
-<!-- index.html -->
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Dinosaur Stories - Share and explore amazing dinosaur discoveries from around the world">
-    <meta name="theme-color" content="#2c5530">
+<!-- index.html BY JOKO PRAMONO RAMADHANI -->
+<!DOCTYPE html> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+<html lang="id"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+<head> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <meta charset="UTF-8"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <meta name="description" content="Dinosaur Stories - Share and explore amazing dinosaur discoveries from around the world"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <meta name="theme-color" content="#2c5530"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
     
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json">
+    <!-- PWA Manifest --> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <link rel="manifest" href="/manifest.json"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
     
-    <!-- Simple favicon using emoji -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦕</text></svg>">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦕</text></svg>">
+    <!-- Simple favicon using emoji --> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦕</text></svg>"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦕</text></svg>"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
     
-    <title>Dinosaur Story App</title>
+    <title>Dinosaur Story App</title> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
     
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
-          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
-          crossorigin=""/>
+    <!-- Leaflet CSS --> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" <!-- index.html BY JOKO PRAMONO RAMADHANI --> 
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="  <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+          crossorigin=""/> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
     
-    <!-- CSS Styles -->
-    <link rel="stylesheet" href="/src/styles/critical.css">
-    <link rel="stylesheet" href="/src/styles/main.css">
-    <link rel="stylesheet" href="/src/styles/components.css">
-    <link rel="stylesheet" href="/src/styles/responsive.css">
-    <link rel="stylesheet" href="/src/styles/transitions.css">
-</head>
-<body>
-    <!-- Notification permission button -->
-    <div id="notification-permission" class="notification-permission hidden">
-        <div class="notification-banner">
-            <p>Get notified about new dinosaur discoveries!</p>
-            <button id="enable-notifications" class="btn btn-primary">Enable Notifications</button>
-            <button id="dismiss-notifications" class="btn btn-secondary">Not Now</button>
-        </div>
-    </div>
+    <!-- CSS Styles --> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <link rel="stylesheet" href="/src/styles/critical.css"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <link rel="stylesheet" href="/src/styles/main.css"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <link rel="stylesheet" href="/src/styles/components.css"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <link rel="stylesheet" href="/src/styles/responsive.css"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <link rel="stylesheet" href="/src/styles/transitions.css"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+</head> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+<body> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <!-- Notification permission button --> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <div id="notification-permission" class="notification-permission hidden"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+        <div class="notification-banner"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+            <p>Get notified about new dinosaur discoveries!</p> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+            <button id="enable-notifications" class="btn btn-primary">Enable Notifications</button> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+            <button id="dismiss-notifications" class="btn btn-secondary">Not Now</button> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+        </div> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    </div> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
     
-    <!-- Install prompt -->
-    <div id="install-prompt" class="install-prompt hidden">
-        <div class="install-banner">
-            <p>Install Dinosaur Stories for better experience</p>
-            <button id="install-app" class="btn btn-primary">Install App</button>
-            <button id="dismiss-install" class="btn btn-secondary">Later</button>
-        </div>
-    </div>
+    <!-- Install prompt --> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <div id="install-prompt" class="install-prompt hidden"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+        <div class="install-banner"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+            <p>Install Dinosaur Stories for better experience</p> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+            <button id="install-app" class="btn btn-primary">Install App</button> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+            <button id="dismiss-install" class="btn btn-secondary">Later</button> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+        </div> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    </div> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
     
-    <!-- Main app dengan struktur semantic TANPA div wrapper -->
-    <header class="app-header" role="banner" id="app-header">
-        <!-- Header akan di-render oleh JavaScript -->
-    </header>
+    <!-- Main app dengan struktur semantic TANPA div wrapper --> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <header class="app-header" role="banner" id="app-header"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+        <!-- Header akan di-render oleh JavaScript --> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    </header> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
     
-    <main id="main-content" class="app-main" role="main">
-        <!-- Konten utama akan di-render oleh JavaScript -->
-    </main>
+    <main id="main-content" class="app-main" role="main"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+        <!-- Konten utama akan di-render oleh JavaScript --> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    </main> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
     
-    <footer class="app-footer" role="contentinfo" id="app-footer">
-        <!-- Footer akan di-render oleh JavaScript -->
-    </footer>
+    <footer class="app-footer" role="contentinfo" id="app-footer"> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+        <!-- Footer akan di-render oleh JavaScript --> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    </footer> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
     
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    <!-- Leaflet JS --> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-            crossorigin=""></script>
+            crossorigin=""></script> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
             
-    <!-- Main app script -->
-    <script type="module" src="/src/main.js"></script>
-</body>
-</html>
+    <!-- Main app script --> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+    <script type="module" src="/src/main.js"></script> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+</body> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
+</html> <!-- index.html BY JOKO PRAMONO RAMADHANI -->
