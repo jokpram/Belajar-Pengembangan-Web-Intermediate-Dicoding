@@ -1,0 +1,3 @@
+APP_URL=http://localhost:5173
+MAP_SERVICE_API_KEY=tidak_menggunakan_API_untuk_openstreetmap
+URL_DEPLOYMENT_NETLIFY=https://pasti-ditolak-dicoding-lagi-hehe.netlify.app/

@@ -1,0 +1,532 @@
+//database.js
+
+// Enhanced IndexedDB utility for complete offline support
+class Database {
+  constructor() {
+    this.dbName = 'DinosaurStoriesDB';
+    this.version = 4;
+    this.db = null;
+  }
+
+  async init() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.version);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        this.db = request.result;
+        resolve(this.db);
+      };
+
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+
+        // Create users store for offline authentication
+        if (!db.objectStoreNames.contains('users')) {
+          const usersStore = db.createObjectStore('users', {
+            keyPath: 'email'
+          });
+          usersStore.createIndex('createdAt', 'createdAt', { unique: false });
+        }
+
+        // Create bookmarks store
+        if (!db.objectStoreNames.contains('bookmarks')) {
+          const bookmarksStore = db.createObjectStore('bookmarks', {
+            keyPath: 'id'
+          });
+          bookmarksStore.createIndex('createdAt', 'createdAt', { unique: false });
+        }
+
+        // Create userPreferences store
+        if (!db.objectStoreNames.contains('userPreferences')) {
+          const preferencesStore = db.createObjectStore('userPreferences', {
+            keyPath: 'key'
+          });
+        }
+
+        // Create offlineStories store
+        if (!db.objectStoreNames.contains('offlineStories')) {
+          const offlineStore = db.createObjectStore('offlineStories', {
+            keyPath: 'id'
+          });
+          offlineStore.createIndex('createdAt', 'createdAt', { unique: false });
+          offlineStore.createIndex('status', 'status', { unique: false });
+        }
+
+        // Create cachedStories store for online stories cache
+        if (!db.objectStoreNames.contains('cachedStories')) {
+          const cachedStore = db.createObjectStore('cachedStories', {
+            keyPath: 'id'
+          });
+          cachedStore.createIndex('createdAt', 'createdAt', { unique: false });
+        }
+
+        // Create pendingActions store for offline operations
+        if (!db.objectStoreNames.contains('pendingActions')) {
+          const pendingStore = db.createObjectStore('pendingActions', {
+            keyPath: 'id',
+            autoIncrement: true
+          });
+          pendingStore.createIndex('type', 'type', { unique: false });
+          pendingStore.createIndex('status', 'status', { unique: false });
+        }
+      };
+    });
+  }
+
+  // TAMBAHKAN FUNCTION YANG MISSING
+  async saveStoriesForOffline(stories) {
+    if (!this.db) await this.init();
+    return this.saveCachedStories(stories);
+  }
+
+  // User operations for offline authentication
+  async registerUser(userData) {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['users'], 'readwrite');
+      const store = transaction.objectStore('users');
+
+      const user = {
+        ...userData,
+        createdAt: new Date().toISOString(),
+        isOffline: true,
+        lastLogin: new Date().toISOString()
+      };
+
+      const request = store.add(user);
+
+      request.onsuccess = () => {
+        // Also save as current user
+        this.savePreference('currentUser', user);
+        resolve(user);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async loginUser(email, password) {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['users'], 'readonly');
+      const store = transaction.objectStore('users');
+
+      const request = store.get(email);
+
+      request.onsuccess = () => {
+        const user = request.result;
+        if (user && user.password === password) {
+          // Update last login
+          user.lastLogin = new Date().toISOString();
+          this.savePreference('currentUser', user);
+          resolve(user);
+        } else {
+          reject(new Error('Invalid email or password'));
+        }
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getCurrentUser() {
+    return await this.getPreference('currentUser');
+  }
+
+  async logoutUser() {
+    await this.savePreference('currentUser', null);
+    await this.savePreference('authToken', null);
+  }
+
+  // Bookmark operations
+  async addBookmark(story) {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['bookmarks'], 'readwrite');
+      const store = transaction.objectStore('bookmarks');
+
+      const bookmark = {
+        ...story,
+        bookmarkedAt: new Date().toISOString(),
+        isBookmarked: true
+      };
+
+      const request = store.add(bookmark);
+
+      request.onsuccess = () => resolve(bookmark);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async removeBookmark(storyId) {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['bookmarks'], 'readwrite');
+      const store = transaction.objectStore('bookmarks');
+
+      const request = store.delete(storyId);
+
+      request.onsuccess = () => resolve(storyId);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getBookmarks() {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['bookmarks'], 'readonly');
+      const store = transaction.objectStore('bookmarks');
+      const request = store.getAll();
+
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async isBookmarked(storyId) {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['bookmarks'], 'readonly');
+      const store = transaction.objectStore('bookmarks');
+
+      const request = store.get(storyId);
+
+      request.onsuccess = () => resolve(!!request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Offline stories operations
+  async saveOfflineStory(storyData) {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['offlineStories'], 'readwrite');
+      const store = transaction.objectStore('offlineStories');
+
+      const story = {
+        id: 'offline-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+        ...storyData,
+        createdAt: new Date().toISOString(),
+        status: 'pending',
+        isOffline: true
+      };
+
+      const request = store.add(story);
+
+      request.onsuccess = () => resolve(story);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getOfflineStories() {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['offlineStories'], 'readonly');
+      const store = transaction.objectStore('offlineStories');
+      const request = store.getAll();
+
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async deleteOfflineStory(storyId) {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['offlineStories'], 'readwrite');
+      const store = transaction.objectStore('offlineStories');
+
+      const request = store.delete(storyId);
+
+      request.onsuccess = () => resolve(storyId);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Cached stories operations for online stories
+  async saveCachedStories(stories) {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['cachedStories'], 'readwrite');
+      const store = transaction.objectStore('cachedStories');
+
+      // Clear existing cached stories
+      const clearRequest = store.clear();
+
+      clearRequest.onsuccess = () => {
+        // Add new stories
+        if (stories && Array.isArray(stories)) {
+          stories.forEach((story, index) => {
+            if (story && story.id) {
+              const cachedStory = {
+                ...story,
+                savedAt: new Date().toISOString(),
+                order: index,
+                isOffline: false,
+                status: 'cached'
+              };
+              store.add(cachedStory);
+            }
+          });
+        }
+
+        transaction.oncomplete = () => resolve(stories || []);
+        transaction.onerror = () => reject(transaction.error);
+      };
+    });
+  }
+
+  async getCachedStories() {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['cachedStories'], 'readonly');
+      const store = transaction.objectStore('cachedStories');
+      const request = store.getAll();
+
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getCachedStory(storyId) {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['cachedStories'], 'readonly');
+      const store = transaction.objectStore('cachedStories');
+
+      const request = store.get(storyId);
+
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Combined stories for offline viewing
+  async getAllStories() {
+    try {
+      const [cachedStories, offlineStories] = await Promise.all([
+        this.getCachedStories(),
+        this.getOfflineStories()
+      ]);
+
+      // Ensure both are arrays
+      const safeCachedStories = Array.isArray(cachedStories) ? cachedStories : [];
+      const safeOfflineStories = Array.isArray(offlineStories) ? offlineStories : [];
+
+      // Combine stories, remove duplicates by id
+      const allStoriesMap = new Map();
+      
+      // Add cached stories first
+      safeCachedStories.forEach(story => {
+        if (story && story.id) {
+          allStoriesMap.set(story.id, story);
+        }
+      });
+      
+      // Add offline stories (will overwrite cached if same id, but offline stories have different ids)
+      safeOfflineStories.forEach(story => {
+        if (story && story.id) {
+          allStoriesMap.set(story.id, story);
+        }
+      });
+
+      const allStories = Array.from(allStoriesMap.values());
+      
+      // Sort by creation date, newest first
+      return allStories.sort((a, b) => {
+        const dateA = new Date(a.createdAt || a.savedAt || 0);
+        const dateB = new Date(b.createdAt || b.savedAt || 0);
+        return dateB - dateA;
+      });
+    } catch (error) {
+      console.error('Error getting all stories:', error);
+      return [];
+    }
+  }
+
+  // User preferences operations
+  async savePreference(key, value) {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['userPreferences'], 'readwrite');
+      const store = transaction.objectStore('userPreferences');
+
+      const request = store.put({ 
+        key, 
+        value, 
+        updatedAt: new Date().toISOString() 
+      });
+
+      request.onsuccess = () => resolve({ key, value });
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getPreference(key) {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['userPreferences'], 'readonly');
+      const store = transaction.objectStore('userPreferences');
+
+      const request = store.get(key);
+
+      request.onsuccess = () => {
+        const result = request.result;
+        resolve(result && result.value !== undefined ? result.value : null);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Pending actions for background sync
+  async addPendingAction(action) {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['pendingActions'], 'readwrite');
+      const store = transaction.objectStore('pendingActions');
+
+      const pendingAction = {
+        ...action,
+        createdAt: new Date().toISOString(),
+        status: 'pending'
+      };
+
+      const request = store.add(pendingAction);
+
+      request.onsuccess = () => resolve(pendingAction);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getPendingActions() {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['pendingActions'], 'readonly');
+      const store = transaction.objectStore('pendingActions');
+      const request = store.getAll();
+
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Clear all data (for logout or cleanup)
+  async clearAllData() {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(
+        ['users', 'bookmarks', 'userPreferences', 'offlineStories', 'cachedStories', 'pendingActions'],
+        'readwrite'
+      );
+
+      transaction.objectStore('users').clear();
+      transaction.objectStore('bookmarks').clear();
+      transaction.objectStore('userPreferences').clear();
+      transaction.objectStore('offlineStories').clear();
+      transaction.objectStore('cachedStories').clear();
+      transaction.objectStore('pendingActions').clear();
+
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  }
+
+  // Check if user is authenticated (online or offline)
+  async isAuthenticated() {
+    const currentUser = await this.getCurrentUser();
+    return !!currentUser;
+  }
+
+  // Get user stats for dashboard
+  async getUserStats() {
+    try {
+      const [bookmarks, offlineStories, pendingActions] = await Promise.all([
+        this.getBookmarks(),
+        this.getOfflineStories(),
+        this.getPendingActions()
+      ]);
+
+      return {
+        bookmarksCount: bookmarks.length,
+        offlineStoriesCount: offlineStories.filter(s => s.isOffline).length,
+        pendingActionsCount: pendingActions.length
+      };
+    } catch (error) {
+      console.error('Error getting user stats:', error);
+      return {
+        bookmarksCount: 0,
+        offlineStoriesCount: 0,
+        pendingActionsCount: 0
+      };
+    }
+  }
+
+  // Initialize database with default data if empty
+  async initializeWithDefaultData() {
+    try {
+      const cachedStories = await this.getCachedStories();
+      if (cachedStories.length === 0) {
+        // Add some default stories for offline use
+        const defaultStories = [
+          {
+            id: 'default-1',
+            name: 'T-Rex Discovery',
+            description: 'An amazing discovery of T-Rex fossils in North America. This massive predator ruled the Cretaceous period.',
+            photoUrl: this.getPlaceholderImage(),
+            createdAt: new Date().toISOString(),
+            lat: 45.0,
+            lon: -100.0
+          },
+          {
+            id: 'default-2',
+            name: 'Triceratops Herd',
+            description: 'Fossilized remains of a Triceratops herd found in Montana. These herbivores lived in large groups for protection.',
+            photoUrl: this.getPlaceholderImage(),
+            createdAt: new Date(Date.now() - 86400000).toISOString(),
+            lat: 46.0,
+            lon: -110.0
+          },
+          {
+            id: 'default-3',
+            name: 'Stegosaurus Plates',
+            description: 'Well-preserved Stegosaurus plates discovered in Colorado. These distinctive features were likely used for temperature regulation.',
+            photoUrl: this.getPlaceholderImage(),
+            createdAt: new Date(Date.now() - 172800000).toISOString(),
+            lat: 39.0,
+            lon: -105.5
+          }
+        ];
+        await this.saveCachedStories(defaultStories);
+        console.log('Default stories initialized for offline use');
+      }
+    } catch (error) {
+      console.error('Error initializing default data:', error);
+    }
+  }
+
+  // Get placeholder image that works offline
+  getPlaceholderImage() {
+    // Use a data URL for placeholder image to avoid network requests
+    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjZjhmOGY4Ii8+CjxwYXRoIGQ9Ik0yMDAgMTUwQzIyMy44MTQgMTUwIDI0MyAxMzAuODE0IDI0MyAxMDdDMjQzIDgzLjE4NTggMjIzLjgxNCA2NCAyMDAgNjRDMTc2LjE4NiA2NCAxNTcgODMuMTg1OCAxNTcgMTA3QzE1NyAxMzAuODE0IDE3Ni4xODYgMTUwIDIwMCAxNTBaIiBmaWxsPSIjZGRkIi8+CjxwYXRoIGQ9Ik0xMDAgMjAwSDMwMFYyMzBIMTAwVjIwMFoiIGZpbGw9IiNkZGQiLz4KPHRleHQgeD0iMjAwIiB5PSIyMDAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+8J+llSBEaW5vc2F1ciBJbWFnZTwvdGV4dD4KPC9zdmc+';
+  }
+}
+
+// Create and export singleton instance
+const database = new Database();
+export default database;

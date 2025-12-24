@@ -1,0 +1,442 @@
+//api.js
+import { getAuthToken, getAuthHeader } from './auth.js';
+import database from './database.js';
+
+const API_BASE_URL = 'https://story-api.dicoding.dev/v1';
+
+// Export isOnline function
+export function isOnline() {
+  return navigator.onLine;
+}
+
+// Enhanced API request function with offline support
+async function apiRequest(url, options = {}) {
+  // Check if we're offline
+  if (!isOnline() && options.method === 'GET') {
+    return handleOfflineRequest(url, options);
+  }
+
+  const token = getAuthToken();
+  
+  const headers = {
+    ...options.headers,
+    ...getAuthHeader()
+  };
+
+  // Remove Content-Type for FormData
+  if (options.body instanceof FormData) {
+    delete headers['Content-Type'];
+  } else if (options.body && typeof options.body === 'object') {
+    headers['Content-Type'] = 'application/json';
+    options.body = JSON.stringify(options.body);
+  }
+
+  const config = {
+    ...options,
+    headers
+  };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${url}`, config);
+    
+    // Handle offline response for story submission
+    if (response.status === 200 && url === '/stories' && options.method === 'POST') {
+      const result = await response.json();
+      if (result.offline) {
+        // Story was saved offline
+        return result;
+      }
+    }
+
+    let result;
+    
+    try {
+      result = await response.json();
+    } catch (parseError) {
+      throw new Error('Invalid response from server');
+    }
+
+    if (!response.ok) {
+      // Auto logout if token is invalid
+      if (response.status === 401) {
+        logout();
+        throw new Error('Session expired. Please login again.');
+      }
+      throw new Error(result.message || `API request failed with status ${response.status}`);
+    }
+
+    if (result.error === false) {
+      return result;
+    } else {
+      throw new Error(result.message || 'Unknown API error');
+    }
+  } catch (error) {
+    console.error('API Request error:', error);
+    
+    // If we're offline and it's a GET request, try offline data
+    if (!isOnline() && options.method === 'GET') {
+      return handleOfflineRequest(url, options);
+    }
+    
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error('Network error. Please check your internet connection.');
+    }
+    throw error;
+  }
+}
+
+// Handle offline requests
+async function handleOfflineRequest(url, options) {
+  console.log('Handling offline request for:', url);
+  
+  if (url === '/stories' && options.method === 'GET') {
+    // Return combined stories from cache and offline stories
+    const allStories = await database.getAllStories();
+    return {
+      error: false,
+      message: 'Offline mode - showing cached stories',
+      listStory: allStories
+    };
+  }
+  
+  if (url.includes('/stories/') && options.method === 'GET') {
+    // Handle individual story request offline
+    const storyId = url.split('/').pop();
+    const story = await database.getCachedStory(storyId);
+    
+    if (story) {
+      return {
+        error: false,
+        message: 'Offline mode - showing cached story',
+        story: story
+      };
+    } else {
+      // Try to find in all stories
+      const allStories = await database.getAllStories();
+      const foundStory = allStories.find(s => s.id === storyId);
+      
+      if (foundStory) {
+        return {
+          error: false,
+          message: 'Offline mode - showing story',
+          story: foundStory
+        };
+      }
+    }
+    
+    throw new Error('Story not found in offline cache');
+  }
+  
+  throw new Error('You are offline. This action requires internet connection.');
+}
+
+// Auth API dengan offline support
+export async function register(userData) {
+  // Validate user data
+  if (!userData.name || !userData.email || !userData.password) {
+    throw new Error('Name, email, and password are required');
+  }
+  
+  if (userData.password.length < 6) {
+    throw new Error('Password must be at least 6 characters long');
+  }
+  
+  return await apiRequest('/register', {
+    method: 'POST',
+    body: userData
+  });
+}
+
+export async function login(credentials) {
+  // Validate credentials
+  if (!credentials.email || !credentials.password) {
+    throw new Error('Email and password are required');
+  }
+  
+  return await apiRequest('/login', {
+    method: 'POST',
+    body: credentials
+  });
+}
+
+// Stories API dengan enhanced offline support
+export async function getStories() {
+  try {
+    const token = getAuthToken();
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    
+    // Initialize database with default data if empty
+    await database.initializeWithDefaultData();
+    
+    const response = await fetch(`${API_BASE_URL}/stories`, { headers });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.error === false && Array.isArray(result.listStory)) {
+      // Cache stories for offline use
+      await database.saveCachedStories(result.listStory);
+      return result.listStory;
+    } else {
+      // Jika tidak ada token, tetap return array kosong untuk public access
+      if (result.message === 'Token tidak valid' || result.message === 'Missing authentication') {
+        const cachedStories = await database.getAllStories();
+        return cachedStories.filter(story => !story.isOffline);
+      }
+      throw new Error(result.message || 'Invalid stories data received');
+    }
+  } catch (error) {
+    console.error('Error fetching stories:', error);
+    
+    // Return cached stories when offline
+    if (!isOnline()) {
+      const cachedStories = await database.getAllStories();
+      return cachedStories;
+    }
+    
+    // Return empty array for public access
+    return [];
+  }
+}
+
+export async function getStory(id) {
+  if (!id) {
+    throw new Error('Story ID is required');
+  }
+  
+  // Try to get from cache first when offline
+  if (!isOnline()) {
+    const story = await database.getCachedStory(id);
+    if (story) {
+      return story;
+    }
+    
+    // Try to find in all stories
+    const allStories = await database.getAllStories();
+    const foundStory = allStories.find(s => s.id === id);
+    if (foundStory) {
+      return foundStory;
+    }
+    
+    throw new Error('Story not found in offline cache');
+  }
+  
+  try {
+    const result = await apiRequest(`/stories/${id}`);
+    
+    // Validate story data
+    if (!result.story || typeof result.story !== 'object') {
+      throw new Error('Invalid story data received');
+    }
+    
+    return result.story;
+  } catch (error) {
+    console.error('Error fetching story:', error);
+    
+    // Fallback to cached story when online but API fails
+    const cachedStory = await database.getCachedStory(id);
+    if (cachedStory) {
+      console.log('Using cached story as fallback');
+      return cachedStory;
+    }
+    
+    throw error;
+  }
+}
+
+export async function addStory(formData) {
+  const token = getAuthToken();
+  if (!token && isOnline()) {
+    throw new Error('Please login to add a story');
+  }
+
+  // Validate FormData
+  const description = formData.get('description');
+  const photo = formData.get('photo');
+  
+  if (!description || !photo) {
+    throw new Error('Description and photo are required');
+  }
+
+  // When offline, save to IndexedDB
+  if (!isOnline()) {
+    const storyData = {
+      description: description,
+      lat: formData.get('lat'),
+      lon: formData.get('lon'),
+      name: `Offline Story - ${new Date().toLocaleDateString()}` // Add default name
+    };
+    
+    const offlineStory = await database.saveOfflineStory(storyData);
+    
+    // Convert photo to base64 for offline storage
+    try {
+      const photoBase64 = await fileToBase64(photo);
+      await database.savePreference(`story_photo_${offlineStory.id}`, photoBase64);
+    } catch (photoError) {
+      console.error('Error saving photo:', photoError);
+      // Continue without photo
+    }
+    
+    return {
+      message: 'Story saved offline. It will be submitted when you are back online.',
+      story: offlineStory,
+      offline: true
+    };
+  }
+
+  return await apiRequest('/stories', {
+    method: 'POST',
+    body: formData
+  });
+}
+
+// Helper function to convert file to base64
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
+}
+
+// Check network status
+export function getNetworkStatus() {
+  return {
+    online: isOnline(),
+    lastChecked: new Date().toISOString()
+  };
+}
+
+// Sync offline data when coming online
+export async function syncOfflineData() {
+  if (!isOnline()) return;
+
+  try {
+    const offlineStories = await database.getOfflineStories();
+    const pendingStories = offlineStories.filter(story => story.status === 'pending');
+
+    for (const story of pendingStories) {
+      try {
+        // Recreate FormData from offline story
+        const formData = new FormData();
+        formData.append('description', story.description);
+        if (story.lat) formData.append('lat', story.lat);
+        if (story.lon) formData.append('lon', story.lon);
+        
+        // Get photo from storage
+        const photoBase64 = await database.getPreference(`story_photo_${story.id}`);
+        if (photoBase64) {
+          const photoBlob = base64ToBlob(photoBase64);
+          formData.append('photo', photoBlob, 'offline-photo.jpg');
+        }
+
+        await addStory(formData);
+        
+        // Remove from offline storage after successful sync
+        await database.deleteOfflineStory(story.id);
+        await database.savePreference(`story_photo_${story.id}`, null);
+        
+      } catch (error) {
+        console.error('Failed to sync offline story:', error);
+      }
+    }
+
+    if (pendingStories.length > 0) {
+      console.log(`Successfully synced ${pendingStories.length} offline stories`);
+      
+      // Show notification
+      if (window.pushManager) {
+        window.pushManager.showNotification(
+          'Stories Synced!',
+          `Successfully submitted ${pendingStories.length} offline stories.`
+        );
+      }
+    }
+  } catch (error) {
+    console.error('Error syncing offline data:', error);
+  }
+}
+
+// Helper function to convert base64 to blob
+function base64ToBlob(base64) {
+  const byteString = atob(base64.split(',')[1]);
+  const mimeString = base64.split(',')[0].split(':')[1].split(';')[0];
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i);
+  }
+  
+  return new Blob([ab], { type: mimeString });
+}
+
+// Enhanced error handling for offline scenarios
+export function setupOfflineHandlers() {
+  window.addEventListener('online', () => {
+    console.log('App is online, syncing data...');
+    
+    // Show online indicator
+    showNetworkStatus(true);
+    
+    // Sync offline data
+    syncOfflineData();
+    
+    // Show online notification
+    if (window.pushManager) {
+      window.pushManager.showNotification('Back Online!', 'Your app is now connected to the internet. Syncing offline data...');
+    }
+  });
+
+  window.addEventListener('offline', () => {
+    console.log('App is offline');
+    
+    // Show offline indicator
+    showNetworkStatus(false);
+    
+    // Show offline notification
+    if (window.pushManager) {
+      window.pushManager.showNotification('Offline Mode', 'You are currently offline. Some features may be limited.');
+    }
+  });
+}
+
+// Show network status in UI
+function showNetworkStatus(online) {
+  // Remove existing status indicators
+  const existingStatus = document.querySelector('.network-status-global');
+  if (existingStatus) {
+    existingStatus.remove();
+  }
+
+  const statusElement = document.createElement('div');
+  statusElement.className = `network-status-global ${online ? 'online' : 'offline'}`;
+  statusElement.innerHTML = `
+    <span>${online ? '🟢 Online' : '🔴 Offline'}</span>
+    <small>${online ? 'You are back online' : 'You are currently offline'}</small>
+  `;
+  
+  document.body.appendChild(statusElement);
+  
+  // Auto remove after 5 seconds
+  setTimeout(() => {
+    if (statusElement.parentNode) {
+      statusElement.remove();
+    }
+  }, 5000);
+}
+
+// Initialize offline handlers when module loads
+setupOfflineHandlers();
+
+// Export logout function
+function logout() {
+  localStorage.removeItem('story_app_token');
+  localStorage.removeItem('story_app_user');
+  window.location.hash = 'home';
+}

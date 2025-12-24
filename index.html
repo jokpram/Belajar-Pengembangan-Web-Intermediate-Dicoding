@@ -1,0 +1,71 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Dinosaur Stories - Share and explore amazing dinosaur discoveries from around the world">
+    <meta name="theme-color" content="#2c5530">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- Simple favicon using emoji -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦕</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦕</text></svg>">
+    
+    <title>Dinosaur Story App</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+          crossorigin=""/>
+    
+    <!-- CSS Styles -->
+    <link rel="stylesheet" href="/src/styles/critical.css">
+    <link rel="stylesheet" href="/src/styles/main.css">
+    <link rel="stylesheet" href="/src/styles/components.css">
+    <link rel="stylesheet" href="/src/styles/responsive.css">
+    <link rel="stylesheet" href="/src/styles/transitions.css">
+</head>
+<body>
+    <!-- Notification permission button -->
+    <div id="notification-permission" class="notification-permission hidden">
+        <div class="notification-banner">
+            <p>Get notified about new dinosaur discoveries!</p>
+            <button id="enable-notifications" class="btn btn-primary">Enable Notifications</button>
+            <button id="dismiss-notifications" class="btn btn-secondary">Not Now</button>
+        </div>
+    </div>
+    
+    <!-- Install prompt -->
+    <div id="install-prompt" class="install-prompt hidden">
+        <div class="install-banner">
+            <p>Install Dinosaur Stories for better experience</p>
+            <button id="install-app" class="btn btn-primary">Install App</button>
+            <button id="dismiss-install" class="btn btn-secondary">Later</button>
+        </div>
+    </div>
+    
+    <!-- Main app dengan struktur semantic TANPA div wrapper -->
+    <header class="app-header" role="banner" id="app-header">
+        <!-- Header akan di-render oleh JavaScript -->
+    </header>
+    
+    <main id="main-content" class="app-main" role="main">
+        <!-- Konten utama akan di-render oleh JavaScript -->
+    </main>
+    
+    <footer class="app-footer" role="contentinfo" id="app-footer">
+        <!-- Footer akan di-render oleh JavaScript -->
+    </footer>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+            
+    <!-- Main app script -->
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>

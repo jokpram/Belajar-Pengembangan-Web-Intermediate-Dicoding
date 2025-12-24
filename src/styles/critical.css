@@ -1,0 +1,242 @@
+/* critical.css - Critical CSS untuk loading awal */
+/* .initial-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    flex-direction: column;
+    gap: 1rem;
+    background: var(--background-color);
+}
+
+.initial-loading .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #2c5530;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+*/
+
+.leaflet-container {
+    height: 100%;
+    width: 100%;
+}
+
+/* Basic focus styles untuk aksesibilitas immediate */
+.skip-link:focus {
+    top: 6px;
+}
+
+/* App structure */
+.app-header,
+.app-main,
+.app-footer {
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.app-header.loaded,
+.app-main.loaded,
+.app-footer.loaded {
+    opacity: 1;
+}
+
+/* Hide initial loading when app is ready */
+body.app-loaded #initial-loading {
+    display: none;
+}
+
+body.app-loaded .app-header,
+body.app-loaded .app-main,
+body.app-loaded .app-footer {
+    opacity: 1;
+}
+
+
+/* critical.css - Tambahan untuk map */
+.map-container {
+    position: relative;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
+    min-height: 400px;
+}
+
+.map {
+    height: 500px;
+    width: 100%;
+    background: #f8f9fa;
+}
+
+.map-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: #f0f0f0;
+    color: var(--text-light);
+    font-style: italic;
+}
+
+.map-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: #f8f9fa;
+    padding: 2rem;
+    text-align: center;
+    color: var(--error-color);
+    border: 2px dashed var(--border-color);
+    border-radius: var(--border-radius);
+}
+
+.map-error p {
+    margin-bottom: 1rem;
+    color: var(--text-color);
+}
+
+/* Ensure map containers have proper dimensions */
+#stories-map,
+#add-story-map,
+#detail-map {
+    min-height: 400px;
+    height: 100%;
+}
+
+/* Tambahkan di file CSS Anda */
+.map-container.small {
+    height: 400px;
+    min-height: 400px;
+    position: relative;
+}
+
+.map-container.small .map {
+    height: 100%;
+    width: 100%;
+    position: relative;
+}
+
+.coordinate-value.coordinate-selected {
+    color: #2563eb;
+    font-weight: bold;
+}
+
+.map-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #6b7280;
+    font-style: italic;
+}
+
+.map-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 20px;
+    text-align: center;
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+}
+
+.btn-tertiary {
+    background-color: #6b7280;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-tertiary:hover {
+    background-color: #4b5563;
+}
+
+/* Ensure map container is visible during transitions */
+.add-story-page .map-container {
+    opacity: 1 !important;
+    transform: none !important;
+}
+/* Hapus atau komentari styles untuk initial-loading */
+/*
+.initial-loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #2c5530;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    color: white;
+}
+
+.initial-loading .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(255,255,255,0.3);
+    border-top: 4px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+*/
+
+/* Tambahkan styles untuk page loading indicator */
+.page-loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(44, 85, 48, 0.9);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    color: white;
+}
+
+.page-loading.hidden {
+    display: none;
+}
+
+.page-loading .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(255,255,255,0.3);
+    border-top: 4px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+.page-loading .loading-text {
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+/* Rest of your critical CSS remains the same */

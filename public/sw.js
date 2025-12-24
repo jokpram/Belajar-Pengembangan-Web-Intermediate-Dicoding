@@ -1,0 +1,415 @@
+//sw.js
+const CACHE_NAME = 'dino-stories-v2.0.0';
+const STATIC_CACHE = 'static-cache-v2';
+const DYNAMIC_CACHE = 'dynamic-cache-v2';
+
+// Assets to cache during install
+const STATIC_ASSETS = [
+  '/',
+  '/index.html',
+  '/src/main.js',
+  '/src/App.js',
+  '/src/router.js',
+  '/src/utils/api.js',
+  '/src/utils/auth.js',
+  '/src/utils/helpers.js',
+  '/src/utils/database.js',
+  '/src/styles/main.css',
+  '/src/styles/components.css',
+  '/src/styles/responsive.css',
+  '/src/styles/transitions.css',
+  '/src/styles/critical.css',
+  '/src/components/Header.js',
+  '/src/components/Footer.js',
+  '/src/components/StoryCard.js',
+  '/src/components/MapComponent.js',
+  '/src/components/CameraCapture.js',
+  '/src/pages/Home.js',
+  '/src/pages/Stories.js',
+  '/src/pages/AddStory.js',
+  '/src/pages/StoryDetail.js',
+  '/src/pages/Login.js',
+  '/src/pages/Register.js',
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+];
+
+// Install event - cache static assets
+self.addEventListener('install', (event) => {
+  console.log('Service Worker: Installing...');
+  
+  event.waitUntil(
+    caches.open(STATIC_CACHE)
+      .then((cache) => {
+        console.log('Service Worker: Caching static assets');
+        return cache.addAll(STATIC_ASSETS).catch(error => {
+          console.log('Cache addAll error (some resources may not be available offline):', error);
+        });
+      })
+      .then(() => {
+        console.log('Service Worker: Install completed');
+        return self.skipWaiting();
+      })
+      .catch((error) => {
+        console.error('Service Worker: Install failed', error);
+      })
+  );
+});
+
+// Activate event - cleanup old caches
+self.addEventListener('activate', (event) => {
+  console.log('Service Worker: Activating...');
+  
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE && cacheName !== CACHE_NAME) {
+            console.log('Service Worker: Deleting old cache', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => {
+      console.log('Service Worker: Activate completed');
+      return self.clients.claim();
+    })
+  );
+});
+
+// Enhanced Fetch with offline support
+self.addEventListener('fetch', (event) => {
+  // Skip non-GET requests
+  if (event.request.method !== 'GET') {
+    // For POST requests, try to handle offline
+    if (event.request.method === 'POST') {
+      event.respondWith(handlePostRequest(event));
+      return;
+    }
+    return;
+  }
+
+  // Skip Chrome extensions and external resources
+  if (event.request.url.startsWith('chrome-extension://')) return;
+  
+  // Skip Vite development server requests
+  if (event.request.url.includes('localhost:5173') && event.request.url.includes('/@')) return;
+
+  // Handle API requests with offline support
+  if (event.request.url.includes('story-api.dicoding.dev')) {
+    event.respondWith(handleApiRequest(event));
+    return;
+  }
+
+  // For development, bypass cache for Vite HMR
+  if (event.request.url.includes('localhost:5173') && 
+      (event.request.url.includes('.js') || event.request.url.includes('.css'))) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // Handle static assets - cache first with network fallback
+  event.respondWith(
+    caches.match(event.request)
+      .then((cachedResponse) => {
+        // Return cached version if available
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+
+        // Otherwise fetch from network
+        return fetch(event.request)
+          .then((response) => {
+            // Check if we received a valid response
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+
+            // Clone the response
+            const responseToCache = response.clone();
+
+            // Cache the new response
+            caches.open(DYNAMIC_CACHE)
+              .then((cache) => {
+                cache.put(event.request, responseToCache).catch(err => {
+                  console.log('Failed to cache response:', err);
+                });
+              });
+
+            return response;
+          })
+          .catch((error) => {
+            console.log('Fetch failed; returning offline page instead.', error);
+            
+            // If both cache and network fail, return offline page for HTML requests
+            if (event.request.headers.get('accept')?.includes('text/html')) {
+              return caches.match('/index.html');
+            }
+            
+            // Return a proper Response object to avoid TypeError
+            return new Response('Network error happened', {
+              status: 408,
+              headers: { 'Content-Type': 'text/plain' },
+            });
+          });
+      })
+  );
+});
+
+// Handle API requests with offline support
+async function handleApiRequest(event) {
+  try {
+    const response = await fetch(event.request);
+    
+    // Cache successful API responses for offline viewing
+    if (response.status === 200) {
+      const responseClone = response.clone();
+      caches.open(DYNAMIC_CACHE).then((cache) => {
+        cache.put(event.request, responseClone).catch(err => {
+          console.log('Failed to cache API response:', err);
+        });
+      });
+    }
+    return response;
+  } catch (error) {
+    console.log('API request failed, trying cache:', error);
+    
+    // Try to return cached API response
+    const cachedResponse = await caches.match(event.request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    
+    // For stories API, return empty array when offline
+    if (event.request.url.includes('/stories') && !event.request.url.includes('/stories/')) {
+      return new Response(JSON.stringify({
+        error: false,
+        message: 'Offline mode - using cached data',
+        listStory: []
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Return offline error for other API requests
+    return new Response(JSON.stringify({
+      error: true,
+      message: 'You are offline. Please check your internet connection.'
+    }), {
+      status: 408,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// Handle POST requests for offline support
+async function handlePostRequest(event) {
+  // For login/register requests, we can't handle them offline
+  if (event.request.url.includes('/login') || event.request.url.includes('/register')) {
+    try {
+      return await fetch(event.request);
+    } catch (error) {
+      return new Response(JSON.stringify({
+        error: true,
+        message: 'You are offline. Cannot login/register without internet connection.'
+      }), {
+        status: 408,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+  
+  // For adding stories, queue for later sync
+  if (event.request.url.includes('/stories')) {
+    return handleOfflineStorySubmission(event);
+  }
+  
+  // For other POST requests, try normally
+  try {
+    return await fetch(event.request);
+  } catch (error) {
+    return new Response(JSON.stringify({
+      error: true,
+      message: 'Network error. Please check your internet connection.'
+    }), {
+      status: 408,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// Handle offline story submission
+async function handleOfflineStorySubmission(event) {
+  try {
+    const response = await fetch(event.request);
+    return response;
+  } catch (error) {
+    // Store the failed request for later sync
+    const requestClone = event.request.clone();
+    const formData = await requestClone.formData();
+    
+    // Store in IndexedDB for later sync
+    await storeOfflineStory(formData);
+    
+    return new Response(JSON.stringify({
+      error: false,
+      message: 'Story saved offline. It will be submitted when you are back online.',
+      offline: true
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// Store offline story in IndexedDB
+async function storeOfflineStory(formData) {
+  const offlineStory = {
+    id: 'offline-' + Date.now(),
+    description: formData.get('description'),
+    lat: formData.get('lat'),
+    lon: formData.get('lon'),
+    photo: formData.get('photo'),
+    createdAt: new Date().toISOString(),
+    status: 'pending'
+  };
+  
+  // Store in a special cache for offline stories
+  const cache = await caches.open('offline-stories');
+  await cache.put('/offline-stories', new Response(JSON.stringify([offlineStory])));
+  
+  // Trigger sync event
+  self.registration.sync.register('offline-stories');
+}
+
+// Push notification event
+self.addEventListener('push', (event) => {
+  console.log('Service Worker: Push received', event);
+
+  if (!event.data) {
+    console.log('Push event but no data');
+    return;
+  }
+
+  let data;
+  try {
+    data = event.data.json();
+    console.log('Push data:', data);
+  } catch (e) {
+    console.log('Push data is not JSON, using text');
+    data = {
+      title: 'Dinosaur Stories',
+      body: event.data.text() || 'New update available!',
+      icon: '/src/assets/icons/icon-192x192.png',
+      badge: '/src/assets/icons/icon-72x72.png',
+      url: '/'
+    };
+  }
+
+  const options = {
+    body: data.body || 'New dinosaur story available!',
+    icon: data.icon || '/src/assets/icons/icon-192x192.png',
+    badge: data.badge || '/src/assets/icons/icon-72x72.png',
+    vibrate: data.vibrate || [100, 50, 100],
+    data: {
+      url: data.url || '/#stories',
+      storyId: data.storyId,
+      timestamp: data.timestamp || new Date().toISOString()
+    },
+    actions: [
+      {
+        action: 'view',
+        title: 'View'
+      },
+      {
+        action: 'dismiss',
+        title: 'Dismiss'
+      }
+    ],
+    tag: data.tag || 'dinosaur-story'
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Dinosaur Stories 🦕', options)
+  );
+});
+
+// Notification click event
+self.addEventListener('notificationclick', (event) => {
+  console.log('Service Worker: Notification click', event);
+
+  event.notification.close();
+
+  const notificationData = event.notification.data || {};
+  
+  if (event.action === 'dismiss') {
+    console.log('Notification dismissed');
+    return;
+  }
+
+  let url = notificationData.url || '/';
+  
+  if (event.action === 'view' && notificationData.storyId) {
+    url = `/#detail?id=${notificationData.storyId}`;
+  }
+
+  event.waitUntil(
+    clients.matchAll({ 
+      type: 'window',
+      includeUncontrolled: true 
+    })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if (client.url.includes(url) && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        
+        if (clients.openWindow) {
+          return clients.openWindow(url);
+        }
+      })
+  );
+});
+
+// Background sync for offline stories
+self.addEventListener('sync', (event) => {
+  console.log('Service Worker: Background sync triggered', event.tag);
+  
+  if (event.tag === 'offline-stories') {
+    event.waitUntil(syncOfflineStories());
+  }
+});
+
+async function syncOfflineStories() {
+  try {
+    const cache = await caches.open('offline-stories');
+    const response = await cache.match('/offline-stories');
+    
+    if (response) {
+      const offlineStories = await response.json();
+      console.log('Syncing offline stories:', offlineStories);
+      
+      // Here you would send the offline stories to your server
+      // For now, we'll just clear them
+      await cache.delete('/offline-stories');
+      
+      // Show notification about successful sync
+      self.registration.showNotification('Stories Synced!', {
+        body: `Successfully submitted ${offlineStories.length} offline stories.`,
+        icon: '/src/assets/icons/icon-192x192.png',
+        badge: '/src/assets/icons/icon-72x72.png'
+      });
+    }
+  } catch (error) {
+    console.error('Background sync failed:', error);
+  }
+}
+
+// Listen for online/offline events
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
